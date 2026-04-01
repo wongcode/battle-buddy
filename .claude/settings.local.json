@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm init:*)",
+      "Read(//usr/local/bin/**)",
+      "Bash(brew list:*)",
+      "Bash(fnm list:*)",
+      "Bash(export PATH=\"/opt/homebrew/bin:$PATH\")",
+      "Bash(npm -v)",
+      "Bash(npm install:*)",
+      "Bash(git init:*)"
+    ]
+  }
+}
