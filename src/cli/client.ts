@@ -1,4 +1,4 @@
-import { BattleState, MoveResult } from "../engine/types";
+import { BattleState, BuddyDef, MoveResult } from "../engine/types";
 
 const API_BASE =
   process.env.BATTLE_BUDDY_API ?? "https://battle-buddy.wongcode.workers.dev";
@@ -16,11 +16,11 @@ async function fetchApi(path: string, options?: RequestInit): Promise<Response> 
 }
 
 export async function createRoom(
-  buddyId: string
+  buddy: BuddyDef
 ): Promise<{ code: string; token: string }> {
   const res = await fetchApi("/room", {
     method: "POST",
-    body: JSON.stringify({ buddyId }),
+    body: JSON.stringify({ buddy }),
   });
   const data = (await res.json()) as { code: string; token: string; error?: string };
   if (!res.ok) throw new Error(data.error ?? "Failed to create room");
@@ -29,11 +29,11 @@ export async function createRoom(
 
 export async function joinRoom(
   code: string,
-  buddyId: string
+  buddy: BuddyDef
 ): Promise<{ token: string; playerIndex: number }> {
   const res = await fetchApi(`/room/${code}/join`, {
     method: "POST",
-    body: JSON.stringify({ buddyId }),
+    body: JSON.stringify({ buddy }),
   });
   const data = (await res.json()) as {
     token: string;

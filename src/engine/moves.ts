@@ -136,6 +136,56 @@ const moves: Record<string, MoveDef> = {
     accuracy: 75,
     cooldown: 3,
   },
+
+  // ── Generic (unknown type fallback) ───────────────────
+  basic_strike: {
+    id: "basic_strike",
+    name: "Basic Strike",
+    description: "A straightforward attack",
+    effect: { kind: "damage", power: 30 },
+    accuracy: 90,
+    cooldown: 0,
+  },
+  fortify: {
+    id: "fortify",
+    name: "Fortify",
+    description: "Brace for incoming hits",
+    effect: { kind: "buff", stat: "defense", amount: 20, turns: 3 },
+    accuracy: 100,
+    cooldown: 3,
+  },
+  drain_touch: {
+    id: "drain_touch",
+    name: "Drain Touch",
+    description: "Sap energy over time",
+    effect: { kind: "dot", power: 8, turns: 3 },
+    accuracy: 85,
+    cooldown: 2,
+  },
+  power_surge: {
+    id: "power_surge",
+    name: "Power Surge",
+    description: "Unleash a burst of energy",
+    effect: { kind: "damage", power: 50 },
+    accuracy: 80,
+    cooldown: 3,
+  },
+  quick_jab: {
+    id: "quick_jab",
+    name: "Quick Jab",
+    description: "A fast, light hit",
+    effect: { kind: "damage", power: 20 },
+    accuracy: 98,
+    cooldown: 0,
+  },
+  root_bind: {
+    id: "root_bind",
+    name: "Root Bind",
+    description: "Immobilize the opponent briefly",
+    effect: { kind: "stun", turns: 1 },
+    accuracy: 60,
+    cooldown: 3,
+  },
 };
 
 export function getMove(id: string): MoveDef {

@@ -1,6 +1,6 @@
-import { BattleState } from "../engine/types";
-import { getBuddy } from "../engine/buddies";
+import { BattleState, BuddyDef, BuddyStats } from "../engine/types";
 import { createBattle, applyMove } from "../engine/battle";
+import { getMove } from "../engine/moves";
 
 // ── Types ────────────────────────────────────────────────
 
@@ -15,7 +15,7 @@ export interface Env {
 
 interface PlayerSlot {
   token: string;
-  buddyId: string;
+  buddy: BuddyDef;
 }
 
 export interface Room {
@@ -24,6 +24,47 @@ export interface Room {
   state: BattleState | null;
   status: "waiting" | "active" | "finished";
   createdAt: number;
+}
+
+// ── Validation ───────────────────────────────────────────
+
+function isValidStat(n: unknown): boolean {
+  return typeof n === "number" && n >= 1 && n <= 200;
+}
+
+function validateBuddy(b: unknown): BuddyDef {
+  if (!b || typeof b !== "object") throw new Error("buddy must be an object");
+  const obj = b as Record<string, unknown>;
+
+  if (typeof obj.name !== "string" || !obj.name.trim()) throw new Error("buddy.name required");
+  if (typeof obj.type !== "string" || !obj.type.trim()) throw new Error("buddy.type required");
+
+  const s = obj.stats as Record<string, unknown> | undefined;
+  if (!s) throw new Error("buddy.stats required");
+  const statKeys: (keyof BuddyStats)[] = ["hp", "attack", "defense", "speed", "special"];
+  for (const k of statKeys) {
+    if (!isValidStat(s[k])) throw new Error(`buddy.stats.${k} must be 1–200`);
+  }
+
+  if (!Array.isArray(obj.moves) || obj.moves.length === 0) throw new Error("buddy.moves required");
+  for (const id of obj.moves as unknown[]) {
+    if (typeof id !== "string") throw new Error("buddy.moves must be strings");
+    getMove(id); // throws if unknown
+  }
+
+  return {
+    name: (obj.name as string).trim().slice(0, 32),
+    type: (obj.type as string).trim().slice(0, 32),
+    description: typeof obj.description === "string" ? obj.description.slice(0, 128) : "",
+    stats: {
+      hp: s.hp as number,
+      attack: s.attack as number,
+      defense: s.defense as number,
+      speed: s.speed as number,
+      special: s.special as number,
+    },
+    moves: (obj.moves as string[]).slice(0, 6),
+  };
 }
 
 // ── Helpers ──────────────────────────────────────────────
@@ -53,19 +94,18 @@ function error(msg: string, status = 400): Response {
 // ── POST /room ───────────────────────────────────────────
 
 export async function handleCreateRoom(request: Request, env: Env): Promise<Response> {
-  let body: { buddyId?: string };
+  let body: { buddy?: unknown };
   try {
-    body = await request.json() as { buddyId?: string };
+    body = await request.json() as { buddy?: unknown };
   } catch {
     return error("invalid JSON");
   }
 
-  if (!body.buddyId) return error("buddyId required");
-
+  let buddy: BuddyDef;
   try {
-    getBuddy(body.buddyId);
-  } catch {
-    return error("unknown buddy");
+    buddy = validateBuddy(body.buddy);
+  } catch (e: unknown) {
+    return error((e as Error).message);
   }
 
   const code = generateCode();
@@ -73,7 +113,7 @@ export async function handleCreateRoom(request: Request, env: Env): Promise<Resp
 
   const room: Room = {
     code,
-    players: [{ token, buddyId: body.buddyId }, null],
+    players: [{ token, buddy }, null],
     state: null,
     status: "waiting",
     createdAt: Date.now(),
@@ -87,14 +127,19 @@ export async function handleCreateRoom(request: Request, env: Env): Promise<Resp
 // ── POST /room/:code/join ────────────────────────────────
 
 export async function handleJoinRoom(request: Request, env: Env, code: string): Promise<Response> {
-  let body: { buddyId?: string };
+  let body: { buddy?: unknown };
   try {
-    body = await request.json() as { buddyId?: string };
+    body = await request.json() as { buddy?: unknown };
   } catch {
     return error("invalid JSON");
   }
 
-  if (!body.buddyId) return error("buddyId required");
+  let buddy1: BuddyDef;
+  try {
+    buddy1 = validateBuddy(body.buddy);
+  } catch (e: unknown) {
+    return error((e as Error).message);
+  }
 
   const roomJson = await env.ROOMS.get(code);
   if (!roomJson) return error("room not found", 404);
@@ -104,18 +149,11 @@ export async function handleJoinRoom(request: Request, env: Env, code: string): 
   if (room.status !== "waiting") return error("room not available");
   if (room.players[1] !== null) return error("room is full");
 
-  let buddy1Def;
-  try {
-    buddy1Def = getBuddy(body.buddyId);
-  } catch {
-    return error("unknown buddy");
-  }
-
   const token = crypto.randomUUID();
-  room.players[1] = { token, buddyId: body.buddyId };
+  room.players[1] = { token, buddy: buddy1 };
 
-  const buddy0Def = getBuddy(room.players[0]!.buddyId);
-  room.state = createBattle(buddy0Def, buddy1Def);
+  const buddy0 = room.players[0]!.buddy;
+  room.state = createBattle(buddy0, buddy1);
   room.status = "active";
 
   await env.ROOMS.put(code, JSON.stringify(room), { expirationTtl: 3600 });

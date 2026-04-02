@@ -1,6 +1,9 @@
 import { Command } from "commander";
 import { gauntlet } from "./gauntlet";
 import { host, join } from "./multiplayer";
+import { loadRegisteredBuddy, saveRegisteredBuddy, getConfigPath } from "./config";
+import { generateBuddy } from "../engine/generate";
+import { prompt } from "./input";
 
 const program = new Command();
 
@@ -28,6 +31,25 @@ program
   .description("Join a multiplayer battle with a room code")
   .action(async (code: string) => {
     await join(code);
+  });
+
+program
+  .command("register")
+  .description("Register your buddy (saved to ~/.battle-buddy.json)")
+  .action(async () => {
+    const existing = loadRegisteredBuddy();
+    if (existing) {
+      console.log(`\nCurrent buddy: ${existing.name} [${existing.type}]`);
+      const overwrite = await prompt("Overwrite? (y/n): ");
+      if (overwrite.toLowerCase() !== "y") return;
+    }
+    const name = (await prompt("Buddy name: ")).trim();
+    const type = (await prompt("Buddy type (e.g. cactus, fern, bonsai): ")).trim().toLowerCase();
+    const description = (await prompt("One-line description (optional): ")).trim();
+    const buddy = generateBuddy(name, type, description);
+    saveRegisteredBuddy(name, type, description);
+    console.log(`\nRegistered ${buddy.name} [${buddy.type}]!`);
+    console.log(`Saved to ${getConfigPath()}`);
   });
 
 // Default: show help if no command

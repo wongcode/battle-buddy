@@ -1,38 +1,51 @@
-import { getBuddy, getAllBuddies, getBuddyIds } from "../engine/buddies";
-import { BattleState } from "../engine/types";
+import { BattleState, BuddyDef } from "../engine/types";
 import {
   renderBattle,
   renderMoveMenu,
   renderMessages,
-  renderBuddySelect,
   renderVictory,
   renderDefeat,
 } from "./render";
-import { promptNumber } from "./input";
+import { prompt, promptNumber } from "./input";
 import { createRoom, joinRoom, pollState, submitMove } from "./client";
+import { loadRegisteredBuddy, saveRegisteredBuddy, getConfigPath } from "./config";
+import { generateBuddy } from "../engine/generate";
 
 const ESC = "\x1b[";
 const RESET = `${ESC}0m`;
 const BOLD = `${ESC}1m`;
 const CYAN = `${ESC}36m`;
+const DIM = `${ESC}2m`;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function selectBuddy(): Promise<string> {
-  const ids = getBuddyIds();
-  const allBuddies = getAllBuddies();
-  const selectData = ids.map((id) => ({
-    id,
-    name: allBuddies[id].name,
-    type: allBuddies[id].type,
-    description: allBuddies[id].description,
-    stats: allBuddies[id].stats as unknown as Record<string, number>,
-  }));
-  console.log(renderBuddySelect(selectData));
-  const choice = await promptNumber("> ", 1, ids.length);
-  return ids[choice - 1];
+// ── Load or register buddy ───────────────────────────────
+
+async function getOrRegisterBuddy(): Promise<BuddyDef> {
+  const existing = loadRegisteredBuddy();
+  if (existing) {
+    console.log(`  Using your buddy: ${BOLD}${existing.name}${RESET} [${existing.type}]\n`);
+    return existing;
+  }
+
+  console.log(`  No buddy registered yet. Let's set one up.\n`);
+  console.log(`  ${DIM}This will be saved to ${getConfigPath()}${RESET}\n`);
+
+  const name = (await prompt("  Your buddy's name: ")).trim();
+  const type = (await prompt("  Your buddy's type (e.g. cactus, fern, bonsai): "))
+    .trim()
+    .toLowerCase();
+  const description = (await prompt("  One-line description (optional): ")).trim();
+
+  const buddy = generateBuddy(name, type, description);
+  saveRegisteredBuddy(name, type, description);
+
+  console.log(`\n  Registered ${BOLD}${buddy.name}${RESET} [${buddy.type}]!`);
+  console.log(`  ${DIM}Edit ${getConfigPath()} to change.${RESET}\n`);
+
+  return buddy;
 }
 
 // ── Shared battle loop ───────────────────────────────────
@@ -122,10 +135,10 @@ async function runMultiplayerBattle(
 export async function host(): Promise<void> {
   console.log(`\n${BOLD}${CYAN}⚔️  HOST MODE${RESET}\n`);
 
-  const buddyId = await selectBuddy();
+  const buddy = await getOrRegisterBuddy();
 
   process.stdout.write("Creating room...");
-  const { code, token } = await createRoom(buddyId);
+  const { code, token } = await createRoom(buddy);
   console.log(" done!\n");
 
   console.log(`  Room code: ${BOLD}${code}${RESET}`);
@@ -149,13 +162,13 @@ export async function join(code: string): Promise<void> {
   const upperCode = code.toUpperCase();
   console.log(`\n${BOLD}${CYAN}⚔️  JOIN MODE — Room: ${upperCode}${RESET}\n`);
 
-  const buddyId = await selectBuddy();
+  const buddy = await getOrRegisterBuddy();
 
   process.stdout.write("Connecting...");
   let token: string;
   let playerIndex: number;
   try {
-    ({ token, playerIndex } = await joinRoom(upperCode, buddyId));
+    ({ token, playerIndex } = await joinRoom(upperCode, buddy));
   } catch (e: unknown) {
     console.log(` failed: ${(e as Error).message}`);
     process.exit(1);
@@ -171,6 +184,3 @@ export async function join(code: string): Promise<void> {
   console.log("Battle starting!\n");
   await runMultiplayerBattle(upperCode, token, state, playerIndex as 0 | 1);
 }
-
-// ── re-export buddy select for gauntlet ──────────────────
-export { getBuddy };
