@@ -1,7 +1,7 @@
 import { BattleState, MoveResult } from "../engine/types";
 
 const API_BASE =
-  process.env.BATTLE_BUDDY_API ?? "https://battle-buddy.workers.dev";
+  process.env.BATTLE_BUDDY_API ?? "https://battle-buddy.wongcode.workers.dev";
 
 export interface RoomState {
   status: "waiting" | "active" | "finished";
