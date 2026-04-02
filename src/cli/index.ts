@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { gauntlet } from "./gauntlet";
 import { host, join } from "./multiplayer";
-import { loadRegisteredBuddy, saveRegisteredBuddy, getConfigPath } from "./config";
+import { loadRegisteredBuddy, saveTypeOverride, getClaudeCompanionName, getConfigPath } from "./config";
 import { generateBuddy } from "../engine/generate";
 import { prompt } from "./input";
 
@@ -35,7 +35,7 @@ program
 
 program
   .command("register")
-  .description("Register your buddy (saved to ~/.battle-buddy.json)")
+  .description("Set your buddy's type (name is read from ~/.claude.json)")
   .action(async () => {
     const existing = loadRegisteredBuddy();
     if (existing) {
@@ -43,11 +43,12 @@ program
       const overwrite = await prompt("Overwrite? (y/n): ");
       if (overwrite.toLowerCase() !== "y") return;
     }
-    const name = (await prompt("Buddy name: ")).trim();
+    const companionName = getClaudeCompanionName();
+    const name = companionName ?? (await prompt("Buddy name: ")).trim();
+    if (companionName) console.log(`Using Claude companion: ${companionName}`);
     const type = (await prompt("Buddy type (e.g. cactus, fern, bonsai): ")).trim().toLowerCase();
-    const description = (await prompt("One-line description (optional): ")).trim();
-    const buddy = generateBuddy(name, type, description);
-    saveRegisteredBuddy(name, type, description);
+    const buddy = generateBuddy(name, type);
+    saveTypeOverride(type);
     console.log(`\nRegistered ${buddy.name} [${buddy.type}]!`);
     console.log(`Saved to ${getConfigPath()}`);
   });

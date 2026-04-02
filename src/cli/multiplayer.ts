@@ -8,7 +8,13 @@ import {
 } from "./render";
 import { prompt, promptNumber } from "./input";
 import { createRoom, joinRoom, pollState, submitMove } from "./client";
-import { loadRegisteredBuddy, saveRegisteredBuddy, getConfigPath } from "./config";
+import {
+  loadRegisteredBuddy,
+  saveTypeOverride,
+  getClaudeCompanionName,
+  getDetectedType,
+  getConfigPath,
+} from "./config";
 import { generateBuddy } from "../engine/generate";
 
 const ESC = "\x1b[";
@@ -30,21 +36,27 @@ async function getOrRegisterBuddy(): Promise<BuddyDef> {
     return existing;
   }
 
-  console.log(`  No buddy registered yet. Let's set one up.\n`);
-  console.log(`  ${DIM}This will be saved to ${getConfigPath()}${RESET}\n`);
+  const companionName = getClaudeCompanionName();
 
-  const name = (await prompt("  Your buddy's name: ")).trim();
-  const type = (await prompt("  Your buddy's type (e.g. cactus, fern, bonsai): "))
-    .trim()
-    .toLowerCase();
-  const description = (await prompt("  One-line description (optional): ")).trim();
+  if (companionName) {
+    // Name comes from ~/.claude.json — only need the type
+    console.log(`  Found your Claude companion: ${BOLD}${companionName}${RESET}`);
+    console.log(`  What type is ${companionName}? (e.g. cactus, fern, bonsai): `);
+    const type = (await prompt("  > ")).trim().toLowerCase();
+    saveTypeOverride(type);
+    const buddy = generateBuddy(companionName, type);
+    console.log(`\n  Ready! ${BOLD}${buddy.name}${RESET} [${buddy.type}]\n`);
+    return buddy;
+  }
 
-  const buddy = generateBuddy(name, type, description);
-  saveRegisteredBuddy(name, type, description);
-
-  console.log(`\n  Registered ${BOLD}${buddy.name}${RESET} [${buddy.type}]!`);
-  console.log(`  ${DIM}Edit ${getConfigPath()} to change.${RESET}\n`);
-
+  // No Claude companion — full setup
+  console.log(`  No buddy found. Let's set one up.\n`);
+  console.log(`  ${DIM}Saved to ${getConfigPath()}${RESET}\n`);
+  const name = (await prompt("  Buddy name: ")).trim();
+  const type = (await prompt("  Buddy type (e.g. cactus, fern, bonsai): ")).trim().toLowerCase();
+  saveTypeOverride(type);
+  const buddy = generateBuddy(name, type);
+  console.log(`\n  Ready! ${BOLD}${buddy.name}${RESET} [${buddy.type}]\n`);
   return buddy;
 }
 
